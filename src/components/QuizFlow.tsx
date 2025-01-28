@@ -4,10 +4,65 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Flame, ThermometerSnowflake, Activity, Instagram, Send, MapPin, ClipboardCheck, Users } from 'lucide-react';
+import { Flame, ThermometerSnowflake, Activity, Send, MapPin, ClipboardCheck, Users, Icon, Instagram} from 'lucide-react';
+
+type LucideIcon = typeof Flame | typeof ThermometerSnowflake | typeof Activity;
+
+
+// Type definitions
+type AreaName = 'north' | 'south' | 'east' | 'west' | 'central';
+type CategoryName = 'burningUp' | 'simmerDown' | 'iceCold';
+type ProfileName = 
+  | "Hell's Kitchener"
+  | "WFH MultiPlugger"
+  | "Graveyard Shift Charger"
+  | "Karang Guni Royalty"
+  | "Taobao Bargain Hunter"
+  | "Homefluencer"
+  | "Pineapple Roller"
+  | "Community Kampung Hero"
+  | "Demure & Mindful"
+  | "Family Guy";
+
+interface AreaInfo {
+  common_fires: string[];
+  emergency_number: string;
+  fire_station: string;
+}
+
+interface ProfileCategory {
+  title: string;
+  description: string;
+  color: string;
+  bgColor: string;
+  profiles: ProfileName[];
+  icon: LucideIcon;
+}
+
+interface QuizOption {
+  text: string;
+  area?: AreaName;
+  profile?: string;
+  category: CategoryName;
+}
+
+interface Question {
+  question: string;
+  options: QuizOption[];
+}
+
+interface Profile {
+  category: CategoryName;
+  profile: ProfileName;
+  title: string;
+  description: string;
+  color: string;
+  bgColor: string;
+  icon: LucideIcon;
+}
 
 // Add area-specific fire information
-const areaFireInfo = {
+const areaFireInfo: Record<AreaName, AreaInfo> = {
     north: {
       common_fires: [
         "Kitchen fires from unattended cooking",
@@ -55,7 +110,7 @@ const areaFireInfo = {
     }
   };
 
-const profileCategories = {
+const profileCategories : Record<CategoryName, ProfileCategory> = {
     burningUp: {
       title: "BURNIN' UP 🔥",
       description: "You're actively creating fire hazards at home!",
@@ -83,7 +138,7 @@ const profileCategories = {
   };
   
 
-  const questions = [
+  const questions : Question[] = [
     {
         question: "Which area do you stay in?",
         options: [
@@ -224,30 +279,32 @@ const profileCategories = {
   // Add more questions here
 ];
 
-const QuizFlow = () => {
-    const [screen, setScreen] = useState('intro');
+const QuizFlow: React.FC = () => {
+    type ScreenType = 'intro' | 'quiz' | 'profile';
+    type SlideDirection = 'slide-left' | 'slide-left-exit';
+  
+    const [screen, setScreen] = useState<ScreenType>('intro');
     const [currentQuestion, setCurrentQuestion] = useState(0);
-    const [answers, setAnswers] = useState([]);
-    const [profile, setProfile] = useState(null);
+    const [answers, setAnswers] = useState<QuizOption[]>([]);
+    const [profile, setProfile] = useState<Profile | null>(null);
     const [progress, setProgress] = useState(0);
-    const [slideDirection, setSlideDirection] = useState('slide-left');
-    const [userArea, setUserArea] = useState(null);
-
+    const [slideDirection, setSlideDirection] = useState<SlideDirection>('slide-left');
+    const [userArea, setUserArea] = useState<AreaName | null>(null);
+  
     useEffect(() => {
       if (questions.length > 0) {
         setProgress((currentQuestion / questions.length) * 100);
       }
     }, [currentQuestion]);
-
-    const handleAnswer = (option) => {
+  
+    const handleAnswer = (option: QuizOption): void => {
       const newAnswers = [...answers, option];
       setAnswers(newAnswers);
-      
-      // Store area if it's the location question
-      if (currentQuestion === 0) {
+  
+      if (currentQuestion === 0 && option.area) {
         setUserArea(option.area);
       }
-      
+  
       if (currentQuestion + 1 < questions.length) {
         setSlideDirection('slide-left');
         setTimeout(() => {
@@ -259,88 +316,65 @@ const QuizFlow = () => {
         setScreen('profile');
       }
     };
-
-    const calculateProfile = (answers) => {
-        // Guard against empty answers
-        if (!answers.length) return null;
-      
-        // Count occurrences of each category
-        const categoryCounts = answers.reduce((acc, answer) => {
-          acc[answer.category] = (acc[answer.category] || 0) + 1;
-          return acc;
-        }, {});
-      
-        // Count occurrences of each profile
-        const profileCounts = answers.reduce((acc, answer) => {
-          if (answer.profile) {
-            const profiles = answer.profile.split(', ');
-            profiles.forEach(profile => {
-              acc[profile] = (acc[profile] || 0) + 1;
-            });
-          }
-          return acc;
-        }, {});
-      
-        // Find the dominant category
-        const dominantCategory = Object.entries(categoryCounts)
-          .sort(([,a], [,b]) => b - a)[0][0];
-      
-        // Find the dominant profile within the category
-        const categoryProfiles = profileCategories[dominantCategory].profiles;
-        let dominantProfile = categoryProfiles[0]; // default to first profile
-        let maxCount = 0;
-      
-        categoryProfiles.forEach(profile => {
-          if (profileCounts[profile] > maxCount) {
-            maxCount = profileCounts[profile];
-            dominantProfile = profile;
-          }
-        });
-      
-        return {
-          category: dominantCategory,
-          profile: dominantProfile,
-          ...profileCategories[dominantCategory]
-        };
+  
+    const calculateProfile = (answers: QuizOption[]): Profile | null => {
+      if (!answers.length) return null;
+  
+      const categoryCounts: Record<CategoryName, number> = answers.reduce((acc, answer) => {
+        acc[answer.category] = (acc[answer.category] || 0) + 1;
+        return acc;
+      }, {} as Record<CategoryName, number>);
+  
+      const profileCounts: Record<string, number> = answers.reduce((acc, answer) => {
+        if (answer.profile) {
+          const profiles = answer.profile.split(', ');
+          profiles.forEach(profile => {
+            acc[profile] = (acc[profile] || 0) + 1;
+          });
+        }
+        return acc;
+      }, {} as Record<string, number>);
+  
+      const dominantCategory = Object.entries(categoryCounts)
+        .sort(([,a], [,b]) => b - a)[0][0] as CategoryName;
+  
+      const categoryProfiles = profileCategories[dominantCategory].profiles;
+      let dominantProfile = categoryProfiles[0];
+      let maxCount = 0;
+  
+      categoryProfiles.forEach(profile => {
+        if (profileCounts[profile] > maxCount) {
+          maxCount = profileCounts[profile];
+          dominantProfile = profile;
+        }
+      });
+  
+      return {
+        category: dominantCategory,
+        profile: dominantProfile,
+        ...profileCategories[dominantCategory]
       };
-
-  const AnimatedBackground = ({ category }) => {
-    const colors = {
-      burningUp: "bg-gradient-to-br from-red-500 to-orange-500",
-      simmerDown: "bg-gradient-to-br from-yellow-400 to-amber-500",
-      iceCold: "bg-gradient-to-br from-blue-400 to-teal-500"
     };
-
-    return (
-      <div 
-        className={`absolute inset-0 transition-colors duration-1000 ${colors[category]}`}
-        role="presentation"
-      />
-    );
-  };
-
-  const ProfileAnimation = ({ category }) => {
-    const animations = {
-      burningUp: (
-        <div className="relative w-32 h-32 mx-auto">
-          <Flame className="absolute inset-0 w-full h-full text-white animate-bounce" aria-hidden="true" />
-        </div>
-      ),
-      simmerDown: (
-        <div className="relative w-32 h-32 mx-auto">
-          <Activity className="absolute inset-0 w-full h-full text-white animate-pulse" aria-hidden="true" />
-        </div>
-      ),
-      iceCold: (
-        <div className="relative w-32 h-32 mx-auto">
-          <ThermometerSnowflake className="absolute inset-0 w-full h-full text-white animate-spin-slow" aria-hidden="true" />
-        </div>
-      )
+  
+    interface AnimatedBackgroundProps {
+      category: CategoryName;
+    }
+  
+    const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ category }) => {
+      const colors: Record<CategoryName, string> = {
+        burningUp: "bg-gradient-to-br from-red-500 to-orange-500",
+        simmerDown: "bg-gradient-to-br from-yellow-400 to-amber-500",
+        iceCold: "bg-gradient-to-br from-blue-400 to-teal-500"
+      };
+  
+      return (
+        <div 
+          className={`absolute inset-0 transition-colors duration-1000 ${colors[category]}`}
+          role="presentation"
+        />
+      );
     };
-
-    return animations[category] || null;
-  };
-
+    
   const renderResourceSection = () => {
     if (!userArea) return null;
     const areaInfo = areaFireInfo[userArea];
@@ -396,16 +430,16 @@ const QuizFlow = () => {
     switch (screen) {
       case 'intro':
         return (
-          <Card className="w-full max-w-2xl mx-auto relative overflow-hidden">
+          <Card className="w-full max-w-md mx-auto relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-orange-500" />
-            <CardContent className="relative p-6 text-center text-white">
-              <div className="w-full h-64 mb-6 flex flex-col items-center justify-center">
-                <Flame className="w-24 h-24 animate-bounce" aria-hidden="true" />
-                <h1 className="text-4xl font-bold mt-4">Too Hot to Handle?</h1>
+            <CardContent className="relative p-4 sm:p-6 text-center text-white">
+              <div className="w-full h-48 sm:h-64 mb-4 sm:mb-6 flex flex-col items-center justify-center">
+                <Flame className="w-16 h-16 sm:w-24 sm:h-24 animate-bounce" aria-hidden="true" />
+                <h1 className="text-2xl sm:text-4xl font-bold mt-4">Too Hot to Handle?</h1>
               </div>
-              <p className="text-xl mb-6">Discover your fire safety profile!</p>
+              <p className="text-lg sm:text-xl mb-4 sm:mb-6">Discover your fire safety profile!</p>
               <Button 
-                className="bg-white text-red-500 hover:bg-gray-100 transition-all duration-300"
+                className="w-full sm:w-auto bg-white text-red-500 hover:bg-gray-100 transition-all duration-300" 
                 onClick={() => setScreen('quiz')}
               >
                 Start Quiz
@@ -416,20 +450,19 @@ const QuizFlow = () => {
 
       case 'quiz':
         if (!questions.length) return <div>Loading questions...</div>;
-        
         return (
           <div className={`transition-all duration-300 ${slideDirection}`}>
-            <Card className="w-full max-w-2xl mx-auto">
-              <CardHeader>
+            <Card className="w-full max-w-md mx-auto">
+              <CardHeader className="p-4 sm:p-6">
                 <Progress value={progress} className="mb-2" aria-label="Quiz progress" />
-                <CardTitle className="text-2xl">Question {currentQuestion + 1} of {questions.length}</CardTitle>
-                <CardDescription className="text-lg">{questions[currentQuestion].question}</CardDescription>
+                <CardTitle className="text-xl sm:text-2xl">Question {currentQuestion + 1} of {questions.length}</CardTitle>
+                <CardDescription className="text-base sm:text-lg">{questions[currentQuestion].question}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 p-4 sm:p-6">
                 {questions[currentQuestion].options.map((option, idx) => (
                   <Button
                     key={idx}
-                    className="w-full text-left justify-start h-auto py-4 px-6 hover:bg-gray-100 transition-colors duration-200"
+                    className="w-full text-left justify-start h-auto py-3 px-4 sm:py-4 sm:px-6 hover:bg-gray-100 transition-colors duration-200 text-sm sm:text-base"
                     variant="outline"
                     onClick={() => handleAnswer(option)}
                   >
@@ -441,77 +474,100 @@ const QuizFlow = () => {
           </div>
         );
 
-          case 'profile':
-            if (!profile) return <div>Calculating your profile...</div>;
-            
-            const ProfileIcon = profileCategories[profile.category].icon;
-            
-            return (
-              <div className="max-w-2xl mx-auto">
-                <Card className={`relative overflow-hidden ${profileCategories[profile.category].bgColor} text-white`}>
-                  {/* Title Banner */}
-                  <div className="absolute top-0 left-0 right-0 text-center py-3 text-3xl font-bold tracking-wider">
-                    {profileCategories[profile.category].title}
-                  </div>
-                  
-                  <CardContent className="pt-16 pb-6 px-6">
-                    {/* Profile Character Area */}
-                    <div className="relative mb-8">
-                      <div className="w-64 h-64 mx-auto rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
-                        <ProfileIcon className="w-32 h-32 text-white" />
-                      </div>
-                    </div>
-      
-                    {/* Profile Content */}
-                    <div className="text-center space-y-4 mb-8">
-                      <h2 className="text-4xl font-bold">{profile.profile}</h2>
-                      <p className="text-xl opacity-90">{profile.description}</p>
-                    </div>
-      
-                    {/* Social Sharing */}
-                    <div className="flex justify-center space-x-4">
-                      <Button 
-                        variant="secondary"
-                        className="bg-white/20 hover:bg-white/30 text-white"
-                        aria-label="Share to Instagram Stories"
-                      >
-                        <Instagram className="mr-2 h-5 w-5" />
-                        Stories
-                      </Button>
-                      <Button 
-                        variant="secondary"
-                        className="bg-white/20 hover:bg-white/30 text-white"
-                        aria-label="Share to TikTok"
-                      >
-                        <Send className="mr-2 h-5 w-5" />
-                        TikTok
-                      </Button>
-                    </div>
-      
-                    {/* Area Information and Resources */}
-                    {renderResourceSection()}
-      
-                    {/* Retake Quiz Option */}
-                    <div className="mt-6 text-center">
-                      <Button
-                        variant="ghost"
-                        className="text-white hover:bg-white/20"
-                        onClick={() => {
-                          setScreen('intro');
-                          setCurrentQuestion(0);
-                          setAnswers([]);
-                          setProfile(null);
-                          setUserArea(null);
-                        }}
-                      >
-                        Retake Quiz
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+      case 'profile':
+        if (!profile) return <div>Calculating your profile...</div>;
+        const CategoryIcon = profile.icon;
+        return (
+          <div className="w-full max-w-md mx-auto px-2">
+            <Card className={`relative overflow-hidden ${profileCategories[profile.category].bgColor} text-white`}>
+              <div className="absolute top-0 left-0 right-0 text-center py-2 sm:py-3 text-xl sm:text-3xl font-bold tracking-wider">
+                {profileCategories[profile.category].title}
               </div>
-            );
-      
+              <CardContent className="pt-12 sm:pt-16 pb-4 sm:pb-6 px-4 sm:px-6">
+                <div className="relative mb-6 sm:mb-8">
+                  <div className="w-48 h-48 sm:w-64 sm:h-64 mx-auto rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
+                    <CategoryIcon size={96} color="white" />
+                  </div>
+                </div>
+                
+                <div className="text-center space-y-3 sm:space-y-4 mb-6 sm:mb-8">
+                  <h2 className="text-2xl sm:text-4xl font-bold">{profile.profile}</h2>
+                  <p className="text-base sm:text-xl opacity-90">{profile.description}</p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-center gap-2 sm:space-x-4">
+                  <Button 
+                    variant="secondary" 
+                    className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white text-sm sm:text-base"
+                  >
+                    <Instagram className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Stories
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white text-sm sm:text-base"
+                  >
+                    <Send className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> TikTok
+                  </Button>
+                </div>
+
+                <div className="mt-6 space-y-4 text-sm sm:text-base">
+                  {userArea && (
+                    <>
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <h3 className="text-lg sm:text-xl font-bold mb-3 flex items-center">
+                          <MapPin className="mr-2" /> Common Fires in Your Area
+                        </h3>
+                        <ul className="list-disc list-inside space-y-2">
+                          {areaFireInfo[userArea].common_fires.map((fire, index) => (
+                            <li key={index}>{fire}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="bg-white/10 rounded-lg p-4">
+                        <h3 className="text-lg sm:text-xl font-bold mb-3">Resources</h3>
+                        <div className="space-y-2">
+                          <Button 
+                            variant="secondary" 
+                            className="w-full bg-white/20 hover:bg-white/30 justify-start text-sm sm:text-base"
+                          >
+                            <ClipboardCheck className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Download Fire Safety Checklist
+                          </Button>
+                          <Button 
+                            variant="secondary" 
+                            className="w-full bg-white/20 hover:bg-white/30 justify-start text-sm sm:text-base"
+                          >
+                            <Users className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Join MyResponder Program
+                          </Button>
+                        </div>
+                        <div className="mt-3 text-xs sm:text-sm">
+                          <p>Emergency Contact: {areaFireInfo[userArea].emergency_number}</p>
+                          <p>Nearest Fire Station: {areaFireInfo[userArea].fire_station}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-4 text-center">
+                  <Button 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20 text-sm sm:text-base"
+                    onClick={() => {
+                      setScreen('intro');
+                      setCurrentQuestion(0);
+                      setAnswers([]);
+                      setProfile(null);
+                      setUserArea(null);
+                    }}
+                  >
+                    Retake Quiz
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
 
       default:
         return null;
@@ -519,18 +575,16 @@ const QuizFlow = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-3 sm:p-6">
       <style jsx global>{`
         .slide-left {
           transform: translateX(0);
           opacity: 1;
         }
-        
         .slide-left-exit {
           transform: translateX(-100%);
           opacity: 0;
         }
-        
         @keyframes slideIn {
           from {
             transform: translateX(100%);
@@ -541,7 +595,6 @@ const QuizFlow = () => {
             opacity: 1;
           }
         }
-        
         .slide-left {
           animation: slideIn 0.3s ease-out;
         }
